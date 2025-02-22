@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pothole Detection - Uploads</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: #f4f4f4;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to the Pothole Detection API</h1>
+    <p>Upload videos and detect potholes with YOLO.</p>
+    <p>Use the <code>/upload</code> endpoint to submit videos.</p>
+
+    <h2>Uploaded Files:</h2>
+    {% if files %}
+        <ul>
+            {% for file in files %}
+                <li>{{ file }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No files uploaded yet.</p>
+    {% endif %}
+</body>
+</html>
