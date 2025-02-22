@@ -1,0 +1,346 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, Button } from 'react-native';
+import { Camera, CameraView } from 'expo-camera';
+import * as Location from 'expo-location';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import axios from 'axios';
+
+export default function HomeScreen() {
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasLocationPermission, setHasLocationPermission] = useState<boolean | null>(null);
+  const [location, setLocation] = useState<null | Location.LocationObject>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState<boolean>(false);
+  const cameraRef = useRef<any>(null);
+  const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      // Request camera permissions
+      const cameraStatus = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(cameraStatus.status === 'granted');
+  
+      // Request location permissions
+      const locationStatus = await Location.requestForegroundPermissionsAsync();
+      setHasLocationPermission(locationStatus.status === 'granted');
+    })();
+  }, []);
+
+  const startStreaming = async () => {
+    if (streaming) return;
+
+    setStreaming(true);
+
+    // Start watching position
+    locationSubscription.current = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.Highest,
+        distanceInterval: 5,
+      },
+      async (currentLocation) => {
+        try {
+          setLocation(currentLocation);
+
+          // Capture image from camera
+          if (cameraRef.current) {
+            // const photo = await cameraRef.current.takePictureAsync({ skipProcessing: true });
+            const photo = { uri: 'dummy_photo_uri' };
+
+            if (photo.uri || true) {
+              // const base64Image = await FileSystem.readAsStringAsync(photo.uri, {
+              //   encoding: FileSystem.EncodingType.Base64,
+              // });
+              const base64Image = 'dummy_base64_image';
+              const payload = {
+                image: `data:image/jpeg;base64,${base64Image}`,
+                location: {
+                  latitude: currentLocation.coords.latitude,
+                  longitude: currentLocation.coords.longitude,
+                },
+              };
+              console.log('Sending data:', payload);
+              
+              await axios.post('https://server-ydz4.onrender.com/upload', payload);
+              setMessage('Data sent successfully!');
+            }
+          }
+        } catch (error) {
+          console.error('Error capturing image or sending data:', error);
+          setMessage(`Error: ${error.message}`);
+        }
+
+        // Clear the message after 3 seconds
+        setTimeout(() => setMessage(null), 3000);
+      }
+    );
+  };
+
+  const stopStreaming = () => {
+    if (!streaming) return;
+
+    setStreaming(false);
+    if (locationSubscription.current) {
+      locationSubscription.current.remove();
+      locationSubscription.current = null;
+    }
+    setMessage('Streaming stopped');
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  if (hasCameraPermission === null || hasLocationPermission === null) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText>Requesting permissions...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  if (!hasCameraPermission || !hasLocationPermission) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText>No access to camera or location. Please enable permissions in your settings.</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      {/* Camera View */}
+      <View style={styles.cameraWrapper}>
+        <CameraView style={styles.camera} ref={cameraRef} />
+      </View>
+
+      {/* Location Info */}
+      <ThemedView style={styles.locationWrapper}>
+        {location ? (
+          <>
+            <ThemedText>Latitude: {location.coords.latitude}</ThemedText>
+            <ThemedText>Longitude: {location.coords.longitude}</ThemedText>
+          </>
+        ) : (
+          <ThemedText>Fetching location...</ThemedText>
+        )}
+      </ThemedView>
+
+      {/* Message */}
+      {message && (
+        <View style={styles.messageWrapper}>
+          <Text style={styles.messageText}>{message}</Text>
+        </View>
+      )}
+
+      {/* Start/Stop Streaming Buttons */}
+      <View style={styles.buttonWrapper}>
+        <Button title="Start Streaming" onPress={startStreaming} disabled={streaming} />
+        <Button title="Stop Streaming" onPress={stopStreaming} disabled={!streaming} />
+      </View>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraWrapper: {
+    flex: 1,
+    width: '90%',
+    height: '50%',
+    margin: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  locationWrapper: {
+    width: '90%',
+    marginTop: 20,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  messageWrapper: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#000',
+    borderRadius: 5,
+  },
+  messageText: {
+    color: '#fff',
+  },
+  buttonWrapper: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 10,
+  },
+});
+
+
+###################################################################################
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Button, Text } from 'react-native';
+import { Camera, CameraView } from 'expo-camera';
+
+export default function HomeScreen() {
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasAudioPermission, setHasAudioPermission] = useState<boolean | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const cameraRef = useRef<any | null>(null);
+  const isRecordingRef = useRef(false); // Ref to track recording state
+  const uploadQueue = useRef<string[]>([]); // Queue to store videos for uploading
+
+  useEffect(() => {
+    (async () => {
+      const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(cameraStatus === 'granted');
+
+      const { status: audioStatus } = await Camera.requestMicrophonePermissionsAsync();
+      setHasAudioPermission(audioStatus === 'granted');
+    })();
+  }, []);
+
+  const uploadVideo = async () => {
+    while (true) {
+      if (uploadQueue.current.length > 0) {
+        const videoUri = uploadQueue.current.shift(); // Get the next video from the queue
+        if (videoUri) {
+          try {
+            const formData = new FormData();
+            formData.append('file', {
+              uri: videoUri,
+              name: `${Date.now()}_recordedVideo.mp4`,
+              type: 'video/mp4',
+            } as any);
+
+            const response = await fetch('http://192.168.1.4:5000/upload', {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+
+            const result = await response.json();
+            setMessage(result.message || 'Upload successful');
+          } catch (error) {
+            setMessage(`Error uploading video: ${error.message}`);
+          }
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Wait briefly before checking again
+      }
+    }
+  };
+
+  const recordAndUploadContinuously = async () => {
+    if (!cameraRef.current) {
+      setMessage('Camera not ready');
+      return;
+    }
+
+    isRecordingRef.current = true;
+    setMessage('Starting continuous recording...');
+    uploadVideo(); // Start the upload process in the background
+
+    while (isRecordingRef.current) {
+      try {
+        setMessage('Recording...');
+        const video = await cameraRef.current.recordAsync({ maxDuration: 10 });
+        uploadQueue.current.push(video.uri); // Add the video to the upload queue
+      } catch (error) {
+        setMessage(`Error during recording: ${error.message}`);
+        isRecordingRef.current = false;
+      }
+    }
+
+    setMessage('Stopped continuous recording.');
+  };
+
+  const stopContinuousRecording = () => {
+    isRecordingRef.current = false; // Stop the loop
+    if (cameraRef.current) {
+      cameraRef.current.stopRecording(); // Stop the current recording
+    }
+    setMessage('Recording stopped by user.');
+  };
+
+  if (hasCameraPermission === null || hasAudioPermission === null) {
+    return (
+      <View style={styles.container}>
+        <Text>Requesting permissions...</Text>
+      </View>
+    );
+  }
+
+  if (!hasCameraPermission || !hasAudioPermission) {
+    return (
+      <View style={styles.container}>
+        <Text>No access to camera or microphone. Please enable permissions in your settings.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.cameraWrapper}>
+        <CameraView mode='video' style={styles.camera} ref={cameraRef} />
+      </View>
+
+      {message && (
+        <View style={styles.messageWrapper}>
+          <Text style={styles.messageText}>{message}</Text>
+        </View>
+      )}
+
+      <View style={styles.buttonWrapper}>
+        <Button title="Start Continuous Recording" onPress={recordAndUploadContinuously} />
+        <Button title="Stop Recording" onPress={stopContinuousRecording} />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraWrapper: {
+    flex: 1,
+    width: '90%',
+    height: '50%',
+    margin: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  messageWrapper: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#000',
+    borderRadius: 5,
+  },
+  messageText: {
+    color: '#fff',
+  },
+  buttonWrapper: {
+    marginTop: 20,
+    flexDirection: 'row',
+    gap: 10,
+  },
+});
