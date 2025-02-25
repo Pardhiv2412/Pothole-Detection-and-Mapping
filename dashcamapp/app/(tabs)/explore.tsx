@@ -70,7 +70,7 @@ export default function HomeScreen() {
       formData.append("startTime", startTime.toString())
       console.log(formData)
 
-      const response = await axios.post("http://192.168.1.2:5000/upload", formData, {
+      const response = await axios.post("https://jeganz-yolo-flask-api.hf.space/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
       setMessage("Upload successful!")
