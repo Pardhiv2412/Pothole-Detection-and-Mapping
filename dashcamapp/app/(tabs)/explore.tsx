@@ -13,12 +13,9 @@ export default function HomeScreen() {
   const [message, setMessage] = useState<string | null>(null)
   const cameraRef = useRef<any | null>(null)
   const isRecordingRef = useRef(false)
-  const locationSubscription = useRef<Location.LocationSubscription | null>(null)
-  const locationLog = useRef<{ timestamp: number; coords: Location.LocationObjectCoords }[]>([])
 
   useEffect(() => {
     ;(async () => {
-      // Request permissions
       const cameraStatus = await Camera.requestCameraPermissionsAsync()
       setHasCameraPermission(cameraStatus.status === "granted")
 
@@ -27,38 +24,42 @@ export default function HomeScreen() {
     })()
   }, [])
 
-  const startLocationTracking = async () => {
-    locationSubscription.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.Highest,
-        distanceInterval: 5,
-      },
-      (location) => {
-        locationLog.current.push({
-          timestamp: Date.now(),
-          coords: location.coords,
-        })
-      },
-    )
+  const recordAndUpload = async () => {
+    if (!cameraRef.current) {
+      setMessage("Camera not ready")
+      return
+    }
+
+    isRecordingRef.current = true
+    setMessage("Capturing start location...")
+
+    try {
+      // Capture start location
+      const startLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+      const startTime = Date.now()
+
+      setMessage("Recording video...")
+      const video = await cameraRef.current.recordAsync({ maxDuration: 1, fps: 30 , mute: true})
+      
+      setMessage("Capturing end location...")
+      // Capture end location
+      const endLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+
+      setMessage("Uploading...")
+      await uploadVideoWithLocation(video.uri, startTime, startLocation, endLocation)
+    } catch (error) {
+      setMessage(`Error: ${error.message}`)
+    } finally {
+      isRecordingRef.current = false
+    }
   }
 
-  const stopLocationTracking = () => {
-    if (locationSubscription.current) {
-      locationSubscription.current.remove()
-      locationSubscription.current = null
-    }
-    locationLog.current = []
-  }
-
-  const uploadVideoWithLocation = async (videoUri: string, startTime: number) => {
-    const payload = {
-      video: {
-        uri: videoUri,
-        name: `${startTime}_recordedVideo.mp4`,
-        type: "video/mp4",
-      },
-      locations: locationLog.current.filter((entry) => entry.timestamp >= startTime),
-    }
+  const uploadVideoWithLocation = async (
+    videoUri: string,
+    startTime: number,
+    startLocation: Location.LocationObjectCoords,
+    endLocation: Location.LocationObjectCoords
+  ) => {
     try {
       const formData = new FormData()
       formData.append("file", {
@@ -66,57 +67,18 @@ export default function HomeScreen() {
         name: `${startTime}_recordedVideo.mp4`,
         type: "video/mp4",
       } as any)
-      formData.append("locations", JSON.stringify(payload.locations))
+      formData.append("startLocation", JSON.stringify(startLocation))
+      formData.append("endLocation", JSON.stringify(endLocation))
       formData.append("startTime", startTime.toString())
-      console.log(formData)
 
       const response = await axios.post("https://jeganz-yolo-flask-api.hf.space/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
+      console.log(response.data);
+      
       setMessage("Upload successful!")
     } catch (error) {
       setMessage(`Upload failed: ${error.message}`)
-    }
-  }
-
-  const recordAndUploadContinuously = async () => {
-    if (!cameraRef.current) {
-      setMessage("Camera not ready")
-      return
-    }
-
-    isRecordingRef.current = true
-    setMessage("Starting continuous recording...")
-    await startLocationTracking() // Start location tracking
-
-    while (isRecordingRef.current) {
-      const startTime = Date.now()
-      try {
-        const video = await cameraRef.current.recordAsync({ maxDuration: 5 })
-        uploadVideoWithLocation(video.uri, startTime)
-      } catch (error) {
-        setMessage(`Error during recording: ${error.message}`)
-        isRecordingRef.current = false
-      }
-    }
-
-    setMessage("Stopped continuous recording.")
-    stopLocationTracking() // Stop location tracking
-  }
-
-  const stopContinuousRecording = () => {
-    isRecordingRef.current = false // Stop the loop
-    if (cameraRef.current) {
-      cameraRef.current.stopRecording() // Stop the current recording
-    }
-    setMessage("Recording stopped by user.")
-  }
-
-  const toggleRecording = () => {
-    if (isRecordingRef.current) {
-      stopContinuousRecording()
-    } else {
-      recordAndUploadContinuously()
     }
   }
 
@@ -131,7 +93,7 @@ export default function HomeScreen() {
   if (!hasCameraPermission || !hasLocationPermission) {
     return (
       <View style={styles.container}>
-        <Text>No access to camera or location. Please enable permissions in your settings.</Text>
+        <Text>No access to camera or location. Please enable permissions in settings.</Text>
       </View>
     )
   }
@@ -149,8 +111,8 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.buttonWrapper}>
-        <TouchableOpacity style={styles.iconButton} onPress={toggleRecording}>
-          <Ionicons name={isRecordingRef.current ? "stop-circle" : "radio-button-on"} size={40} color="white" />
+        <TouchableOpacity style={styles.iconButton} onPress={recordAndUpload}>
+        <Ionicons name={isRecordingRef.current ? "stop-circle" : "radio-button-on"} size={40} color="white" />
         </TouchableOpacity>
       </View>
     </View>
@@ -203,4 +165,3 @@ const styles = StyleSheet.create({
     margin: 10,
   },
 })
-

@@ -78,10 +78,12 @@ def insert_location_into_db(latitude, longitude):
         conn = psycopg2.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute('''SELECT * FROM potholes WHERE latitude = %s AND longitude = %s''', (latitude, longitude))
-
+        print('inside insert_location_into_db')
         if cursor.fetchone() is None:
             cursor.execute('''INSERT INTO potholes (latitude, longitude, severity) VALUES (%s, %s, 4)''', (latitude, longitude))
             conn.commit()
+        else:
+            print('Pothole already exists in the database')
     except Exception:
         pass
     finally:
@@ -113,11 +115,11 @@ def process_video():
         except Exception:
             locations_data = []
         
-        locations_filename = f"{file_id}.json"
-        locations_path = os.path.join(UPLOAD_FOLDER, locations_filename)
+        # locations_filename = f"{file_id}.json"
+        # locations_path = os.path.join(UPLOAD_FOLDER, locations_filename)
         
-        with open(locations_path, "w") as json_file:
-            json.dump(locations_data, json_file, indent=4)
+        # with open(locations_path, "w") as json_file:
+        #     json.dump(locations_data, json_file, indent=4)
 
         start_time_str = request.form.get('start_time', '')
         start_time = convert_iso_to_epoch(start_time_str) or 0
@@ -130,35 +132,42 @@ def process_video():
 
         fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
         frame_count = 0
+        frame_interval = int(fps / 3)  # Process only 2 frames per second
 
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
                 break
             
-            frame_time = frame_count / fps + start_time
-            result = detect_objects_with_yolo(frame)
+            # Process only every Nth frame
+            if frame_count % frame_interval == 0:
+                frame_time = frame_count / fps + start_time
+                
+                # result = None  # Skip detection for now
+                result = detect_objects_with_yolo(frame)
 
-            if result and len(result.boxes) > 0:
-                for box in result.boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-                    conf = float(box.conf[0].cpu().numpy())
-                    cls = int(box.cls[0].cpu().numpy())
-                    class_name = model.names[cls]
+                if result and len(result.boxes) > 0:
+                    for box in result.boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                        conf = float(box.conf[0].cpu().numpy())
+                        cls = int(box.cls[0].cpu().numpy())
+                        class_name = model.names[cls]
+                if len(result.boxes) > 0:
+                    print('kuzhii ondee')
+                    nearest_location = find_nearest_location(frame_time, locations_data)
+                    print('location ondee : ',nearest_location)
+                    if nearest_location:
+                        insert_location_into_db(nearest_location['coords']['latitude'], nearest_location['coords']['longitude'])
+            frame_count += 1  # Always increment the frame count
 
-                    if class_name.lower() == 'pothole':
-                        nearest_location = find_nearest_location(frame_time, locations_data)
-                        if nearest_location:
-                            insert_location_into_db(nearest_location.get('latitude'), nearest_location.get('longitude'))
-
-            frame_count += 1
 
         cap.release()
-        # os.remove(filepath)  # Delete the saved file after processing
+        os.remove(filepath)  # Delete the saved file after processing
 
         return jsonify({'message': 'Video processed successfully'}), 200
 
     except Exception as e:
+        print(e)
         return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
 
 @app.route('/', methods=['GET'])
