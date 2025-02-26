@@ -27,7 +27,7 @@ const LEAFLET_HTML = `
     <script>
         var map = L.map('map').setView([9.959792, 76.405983], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; <a href="https://github.com/Pardhiv2412/Pothole-Detection-and-Mapping">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         var userMarker;

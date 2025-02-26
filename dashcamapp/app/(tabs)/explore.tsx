@@ -13,47 +13,86 @@ export default function HomeScreen() {
   const [message, setMessage] = useState<string | null>(null)
   const cameraRef = useRef<any | null>(null)
   const isRecordingRef = useRef(false)
+  const videoQueue = []
+  const isUploading = useRef(false)
+  const uploadCount = useRef(0);
 
   useEffect(() => {
-    ;(async () => {
-      const cameraStatus = await Camera.requestCameraPermissionsAsync()
-      setHasCameraPermission(cameraStatus.status === "granted")
+    (async () => {
+      const cameraStatus = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(cameraStatus.status === "granted");
 
-      const locationStatus = await Location.requestForegroundPermissionsAsync()
-      setHasLocationPermission(locationStatus.status === "granted")
-    })()
-  }, [])
+      const audioStatus = await Camera.requestMicrophonePermissionsAsync();
+
+      const locationStatus = await Location.requestForegroundPermissionsAsync();
+      setHasLocationPermission(locationStatus.status === "granted");
+    })();
+  }, []);
+
+  const startAndStopRecording = () => {
+    if (isRecordingRef.current) {
+
+      isRecordingRef.current = false;
+      setMessage("Recording stopped.");
+    } else {
+
+      isRecordingRef.current = true;
+      setMessage("Recording started...");
+      recordAndUpload();
+    }
+  };
 
   const recordAndUpload = async () => {
-    if (!cameraRef.current) {
-      setMessage("Camera not ready")
+    if (!isRecordingRef.current || !cameraRef.current) {
       return
     }
 
-    isRecordingRef.current = true
-    setMessage("Capturing start location...")
+    while (isRecordingRef.current) {
 
-    try {
-      // Capture start location
-      const startLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
-      const startTime = Date.now()
+      try {
+        setMessage("Start Location fetching...")
+        const startLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+        const startTime = Date.now()
 
-      setMessage("Recording video...")
-      const video = await cameraRef.current.recordAsync({ maxDuration: 1, fps: 30 , mute: true})
-      
-      setMessage("Capturing end location...")
-      // Capture end location
-      const endLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+        setMessage("Recording video...")
+        const video = await cameraRef.current.recordAsync({ maxDuration: 1, fps: 30, mute: true })
 
-      setMessage("Uploading...")
-      await uploadVideoWithLocation(video.uri, startTime, startLocation, endLocation)
-    } catch (error) {
-      setMessage(`Error: ${error.message}`)
-    } finally {
-      isRecordingRef.current = false
+        setMessage("End Location fetching...")
+        const endLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+
+        if (!isRecordingRef.current) {
+          return;
+        }
+
+        videoQueue.push({ videoUri: video.uri, startTime, startLocation, endLocation })
+
+        // Start upload process if not already running
+        if (!isUploading.current) {
+          uploadFromQueue()
+        }
+      } catch (error) {
+        setMessage(`Error: ${error.message}`)
+        isRecordingRef.current = false
+      }
     }
   }
 
+  const uploadFromQueue = async () => {
+    isUploading.current = true
+
+    while (videoQueue.length > 0) {
+      const { videoUri, startTime, startLocation, endLocation } = videoQueue.shift() // Remove from queue
+
+      uploadCount.current += 1; // Increment count
+      try {
+        await uploadVideoWithLocation(videoUri, startTime, startLocation, endLocation)
+        setMessage(`Uploaded video #${uploadCount.current} from queue`)
+      } catch (error) {
+        setMessage(`Upload failed: ${error.message}`)
+      }
+    }
+    isUploading.current = false
+  }
   const uploadVideoWithLocation = async (
     videoUri: string,
     startTime: number,
@@ -75,7 +114,7 @@ export default function HomeScreen() {
         headers: { "Content-Type": "multipart/form-data" },
       })
       console.log(response.data);
-      
+
       setMessage("Upload successful!")
     } catch (error) {
       setMessage(`Upload failed: ${error.message}`)
@@ -111,8 +150,8 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.buttonWrapper}>
-        <TouchableOpacity style={styles.iconButton} onPress={recordAndUpload}>
-        <Ionicons name={isRecordingRef.current ? "stop-circle" : "radio-button-on"} size={40} color="white" />
+        <TouchableOpacity style={styles.iconButton} onPress={startAndStopRecording}>
+          <Ionicons name={isRecordingRef.current ? "stop-circle" : "radio-button-on"} size={40} color="white" />
         </TouchableOpacity>
       </View>
     </View>
