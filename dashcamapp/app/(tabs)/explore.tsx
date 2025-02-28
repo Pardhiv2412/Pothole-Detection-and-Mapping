@@ -16,6 +16,8 @@ export default function HomeScreen() {
   const videoQueue = []
   const isUploading = useRef(false)
   const uploadCount = useRef(0);
+  const locationSubscription = useRef<Location.LocationSubscription | null>(null)
+  const locationLog = useRef<{ timestamp: number; coords: Location.LocationObjectCoords }[]>([])
 
   useEffect(() => {
     (async () => {
@@ -29,10 +31,44 @@ export default function HomeScreen() {
     })();
   }, []);
 
+  const startLocationTracking = async (durationMs: number) => {
+    locationLog.current = []
+    locationSubscription.current = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.Highest,
+        timeInterval: 500, // Track every 500ms
+        distanceInterval: 1, // Ensure updates even when stationary
+      },
+      (location) => {
+        locationLog.current.push({
+          timestamp: Date.now(),
+          coords: location.coords,
+        })
+      }
+    )
+
+    setTimeout(() => {
+      if (locationSubscription.current) {
+        locationSubscription.current.remove()
+        locationSubscription.current = null
+      }
+      locationLog.current.length = 0
+    }, durationMs)
+  }
+
+  const stopLocationTracking = () => {
+    if (locationSubscription.current) {
+      locationSubscription.current.remove()
+      locationSubscription.current = null
+    }
+    locationLog.current.length = 0
+  }
+
   const startAndStopRecording = () => {
     if (isRecordingRef.current) {
 
       isRecordingRef.current = false;
+      stopLocationTracking();
       setMessage("Recording stopped.");
     } else {
 
@@ -50,22 +86,17 @@ export default function HomeScreen() {
     while (isRecordingRef.current) {
 
       try {
-        setMessage("Start Location fetching...")
-        const startLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+
         const startTime = Date.now()
-
         setMessage("Recording video...")
-        const video = await cameraRef.current.recordAsync({ maxDuration: 1, fps: 30, mute: true })
-
-        setMessage("End Location fetching...")
-        const endLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
+        await startLocationTracking(5000);
+        const video = await cameraRef.current.recordAsync({ maxDuration: 5, fps: 30, mute: true })
 
         if (!isRecordingRef.current) {
           return;
         }
 
-        videoQueue.push({ videoUri: video.uri, startTime, startLocation, endLocation })
-
+        videoQueue.push({ videoUri: video.uri, startTime, locations: [...locationLog.current] })
         // Start upload process if not already running
         if (!isUploading.current) {
           uploadFromQueue()
@@ -81,11 +112,11 @@ export default function HomeScreen() {
     isUploading.current = true
 
     while (videoQueue.length > 0) {
-      const { videoUri, startTime, startLocation, endLocation } = videoQueue.shift() // Remove from queue
+      const { videoUri, startTime, locations } = videoQueue.shift() // Remove from queue
 
       uploadCount.current += 1; // Increment count
       try {
-        await uploadVideoWithLocation(videoUri, startTime, startLocation, endLocation)
+        await uploadVideoWithLocation(videoUri, startTime, locations)
         setMessage(`Uploaded video #${uploadCount.current} from queue`)
       } catch (error) {
         setMessage(`Upload failed: ${error.message}`)
@@ -96,8 +127,8 @@ export default function HomeScreen() {
   const uploadVideoWithLocation = async (
     videoUri: string,
     startTime: number,
-    startLocation: Location.LocationObjectCoords,
-    endLocation: Location.LocationObjectCoords
+    Locations: { timestamp: number; coords: Location.LocationObjectCoords }[]
+
   ) => {
     try {
       const formData = new FormData()
@@ -106,11 +137,10 @@ export default function HomeScreen() {
         name: `${startTime}_recordedVideo.mp4`,
         type: "video/mp4",
       } as any)
-      formData.append("startLocation", JSON.stringify(startLocation))
-      formData.append("endLocation", JSON.stringify(endLocation))
+      formData.append("locations", JSON.stringify(Locations))
       formData.append("startTime", startTime.toString())
 
-      const response = await axios.post("https://jeganz-yolo-flask-api.hf.space/upload", formData, {
+      const response = await axios.post("https://jeganz-pothole-api.hf.space/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
       console.log(response.data);
