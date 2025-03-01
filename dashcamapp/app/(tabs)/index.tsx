@@ -27,7 +27,7 @@ const LEAFLET_HTML = `
     <script>
         var map = L.map('map').setView([9.959792, 76.405983], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://github.com/Pardhiv2412/Pothole-Detection-and-Mapping">OpenStreetMap</a> contributors'
+            attribution: '&copy; <a href="https://github.com/Pardhiv2412/Pothole-Detection-and-Mapping">UKP Mex</a> 2025'
         }).addTo(map);
 
         var userMarker;
@@ -41,22 +41,33 @@ const LEAFLET_HTML = `
             map.setView([lat, lng], 15);
         }
 
-        function plotPotholes(potholes) {
-            potholeLayer.clearLayers();
-            potholes.forEach(({ coordinates, severity }) => {
-                const color = severity > 7 ? "red" : severity > 4 ? "orange" : "yellow";
-                L.circleMarker(coordinates, {
-                    radius: 8,
-                    fillColor: color,
-                    color: "black",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.7,
-                })
-                .bindPopup('Pothole Severity: ' + severity)
-                .addTo(potholeLayer);
-            });
-        }
+        function getColor(severity) {
+    switch (severity) {
+        case 1: return "#FFFF00"; // Yellow
+        case 2: return "#FFD700"; // Light Orange
+        case 3: return "#FFA500"; // Orange
+        case 4: return "#FF4500"; // Dark Orange
+        case 5: return "#FF0000"; // Red
+        default: return "#808080"; // Gray for invalid values
+    }
+}
+
+function plotPotholes(potholes) {
+    potholeLayer.clearLayers();
+    potholes.forEach(({ coordinates, severity }) => {
+        const color = getColor(Math.round(severity)); // Ensure severity is an integer from 1 to 5
+        L.circleMarker(coordinates, {
+            radius: 8,
+            fillColor: color,
+            color: "black",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.7,
+        })
+        .bindPopup('Pothole Severity: ' + severity)
+        .addTo(potholeLayer);
+    });
+}
 
         window.updateLocation = updateLocation;
         window.plotPotholes = plotPotholes;
@@ -89,7 +100,7 @@ export default function TabTwoScreen() {
   const fetchPotholes = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch("https://jeganz-yolo-flask-api.hf.space/potholes")
+      const response = await fetch("https://jeganz-pothole-api.hf.space/potholes")
       if (response.ok) {
         const data = await response.json()
         const formattedData = data.map((pothole) => ({
