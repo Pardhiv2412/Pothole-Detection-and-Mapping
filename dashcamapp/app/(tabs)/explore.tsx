@@ -31,7 +31,7 @@ export default function HomeScreen() {
     locationSubscription.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.Highest,
-        distanceInterval: 5
+        distanceInterval: 3
       },
       (location) => {
         locationLog.current.push({
@@ -51,10 +51,6 @@ export default function HomeScreen() {
   }
 
   const uploadVideoWithLocation = async (videoUri: string, startTime: number) => {
-    if (!isRecordingRef.current) {
-      setMessage("Recording stopped. Uploading in progress");
-    }
-
     try {
       const formData = new FormData()
       formData.append("file", {
@@ -73,7 +69,9 @@ export default function HomeScreen() {
     } catch (error) {
       setMessage(`Upload failed: ${error.message}`)
     }
-    setMessage("Recording and Uploading stopped");
+    if (!isRecordingRef.current) {
+      setMessage("Recording and Uploading stopped");
+    }
   }
 
   const recordAndUploadContinuously = async () => {
@@ -86,7 +84,7 @@ export default function HomeScreen() {
     await startLocationTracking() // Start location tracking
 
     while (isRecordingRef.current) {
-      setMessage("Recording...")
+      setMessage("Recording")
       const startTime = Date.now()
       try {
         const video = await cameraRef.current.recordAsync({ maxDuration: 5, mute: true, fps: 30 })
@@ -97,7 +95,7 @@ export default function HomeScreen() {
       }
     }
 
-    setMessage("Stopped Recording")
+    setMessage("Stopped Recording. Uploading in progress")
     stopLocationTracking() // Stop location tracking
   }
 
@@ -106,7 +104,7 @@ export default function HomeScreen() {
     if (cameraRef.current) {
       cameraRef.current.stopRecording() // Stop the current recording
     }
-    setMessage("Recording stopped by user.")
+    setMessage("Recording stopped by user")
   }
 
   const toggleRecording = () => {

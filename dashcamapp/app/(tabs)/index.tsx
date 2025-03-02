@@ -12,16 +12,25 @@ import { ThemedView } from "@/components/ThemedView"
 const LEAFLET_HTML = `
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
-        body { padding: 0; margin: 0; }
-        #map { height: 100vh; width: 100vw; }
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
     </style>
 </head>
+
 <body>
     <div id="map"></div>
     <script>
@@ -42,37 +51,38 @@ const LEAFLET_HTML = `
         }
 
         function getColor(severity) {
-    switch (severity) {
-        case 1: return "#FFFF00"; // Yellow
-        case 2: return "#FFD700"; // Light Orange
-        case 3: return "#FFA500"; // Orange
-        case 4: return "#FF4500"; // Dark Orange
-        case 5: return "#FF0000"; // Red
-        default: return "#808080"; // Gray for invalid values
-    }
-}
+            switch (severity) {
+                case 1: return "#FFFF00"; // Yellow
+                case 2: return "#FFD700"; // Light Orange
+                case 3: return "#FFA500"; // Orange
+                case 4: return "#FF4500"; // Dark Orange
+                case 5: return "#FF0000"; // Red
+                default: return "#808080"; // Gray for invalid values
+            }
+        }
 
-function plotPotholes(potholes) {
-    potholeLayer.clearLayers();
-    potholes.forEach(({ coordinates, severity }) => {
-        const color = getColor(Math.round(severity)); // Ensure severity is an integer from 1 to 5
-        L.circleMarker(coordinates, {
-            radius: 8,
-            fillColor: color,
-            color: "black",
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.7,
-        })
-        .bindPopup('Pothole Severity: ' + severity)
-        .addTo(potholeLayer);
-    });
-}
+        function plotPotholes(potholes) {
+            potholeLayer.clearLayers();
+            potholes.forEach(({ coordinates, severity }) => {
+                const color = getColor(Math.ceil(severity)); // Rounds up severity to next int
+                L.circleMarker(coordinates, {
+                    radius: 8,
+                    fillColor: color,
+                    color: "black",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.7,
+                })
+                    .bindPopup('Pothole Severity: ' + severity)
+                    .addTo(potholeLayer);
+            });
+        }
 
         window.updateLocation = updateLocation;
         window.plotPotholes = plotPotholes;
     </script>
 </body>
+
 </html>
 `
 
@@ -116,7 +126,7 @@ export default function TabTwoScreen() {
         console.error("Failed to fetch potholes")
       }
     } catch (error) {
-      console.error("Error fetching potholes:", error)
+      console.error("Error fetching potholes: ", error)
     } finally {
       setIsLoading(false)
     }

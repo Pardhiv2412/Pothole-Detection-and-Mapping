@@ -4,7 +4,7 @@
     "slug": "dashcamapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/mapicon.png",
+    "icon": "./assets/images/dynamicicon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/mapicon.png",
+        "foregroundImage": "./assets/images/dynamicicon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.jeganz.dashcamapp",
@@ -33,7 +33,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/mapicon.png",
+          "image": "./assets/images/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
