@@ -23,14 +23,16 @@ CREATE TABLE IF NOT EXISTS pothole_data (
 # Connect to the database and execute the query
 try:
     conn = psycopg2.connect(**db_config)
-    cursor = conn.cursor()
+    cur = conn.cursor()
     
-    cursor.execute(create_table_query)
+    cur.execute("SELECT * FROM potholes")
+
+    for row in cur.fetchall():
+        print(row)
+
     conn.commit()
     
-    print("Table 'pothole_data' created successfully.")
-    
-    cursor.close()
+    cur.close()
     conn.close()
 except Exception as e:
     print("Error:", e)

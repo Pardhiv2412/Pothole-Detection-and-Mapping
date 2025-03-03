@@ -22,6 +22,8 @@ export default function HomeScreen() {
       const cameraStatus = await Camera.requestCameraPermissionsAsync()
       setHasCameraPermission(cameraStatus.status === "granted")
 
+      await Camera.requestMicrophonePermissionsAsync();
+
       const locationStatus = await Location.requestForegroundPermissionsAsync()
       setHasLocationPermission(locationStatus.status === "granted")
     })()
@@ -65,7 +67,6 @@ export default function HomeScreen() {
       const response = await axios.post("https://jeganz-pothole-api.hf.space/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
-      setMessage("Upload successful!")
     } catch (error) {
       setMessage(`Upload failed: ${error.message}`)
     }
@@ -95,7 +96,7 @@ export default function HomeScreen() {
       }
     }
 
-    setMessage("Stopped Recording. Uploading in progress")
+    setMessage("Recording stopped. Uploading in progress")
     stopLocationTracking() // Stop location tracking
   }
 

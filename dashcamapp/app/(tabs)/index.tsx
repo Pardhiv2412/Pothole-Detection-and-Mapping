@@ -62,21 +62,36 @@ const LEAFLET_HTML = `
         }
 
         function plotPotholes(potholes) {
-            potholeLayer.clearLayers();
-            potholes.forEach(({ coordinates, severity }) => {
-                const color = getColor(Math.ceil(severity)); // Rounds up severity to next int
-                L.circleMarker(coordinates, {
-                    radius: 8,
-                    fillColor: color,
-                    color: "black",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.7,
-                })
-                    .bindPopup('Pothole Severity: ' + severity)
-                    .addTo(potholeLayer);
-            });
-        }
+    potholeLayer.clearLayers();
+
+    function getMarkerSize(zoom) {
+        return Math.max(3, zoom*0.5); 
+    }
+
+    potholes.forEach(({ coordinates, severity }) => {
+        const color = getColor(Math.ceil(severity));
+
+        const circleMarker = L.circleMarker(coordinates, {
+            radius: getMarkerSize(map.getZoom()), // Adjust size based on zoom level
+            fillColor: color,
+            color: "black",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.7,
+        }).bindPopup('Pothole Severity: ' + severity);
+
+        circleMarker.addTo(potholeLayer);
+    });
+
+    map.on("zoomend", () => {
+        potholeLayer.eachLayer((layer) => {
+            if (layer instanceof L.CircleMarker) {
+                layer.setRadius(getMarkerSize(map.getZoom())); // Update marker size on zoom
+            }
+        });
+    });
+}
+
 
         window.updateLocation = updateLocation;
         window.plotPotholes = plotPotholes;
@@ -168,7 +183,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 16,
+    marginBottom: 10,
   },
   mapContainer: {
     flex: 1,
